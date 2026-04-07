@@ -6,7 +6,11 @@ set -euo pipefail
 # Purpose:
 #   Upload/download Terraform plan + logs to/from Tencent COS using coscli.
 #
-# Requirements:
+# Dev/Test mode (no bucket required):
+#   If DEV_MODE=1 (or CI_MOCK=1), operations are performed on the local filesystem
+#   under $DEV_ARTIFACTS_DIR, mirroring COS paths. This is for CI lint/tests.
+#
+# Requirements (real COS mode):
 #   - coscli installed in the runner/agent
 #   - Env vars for auth (recommended):
 #       COS_SECRET_ID
@@ -15,33 +19,34 @@ set -euo pipefail
 #       COS_SESSION_TOKEN
 #
 #   - Env vars for target bucket/path:
-#       COS_BUCKET          e.g. my-bucket-123456
-#       COS_REGION          e.g. ap-singapore
-#       COS_PREFIX          e.g. terraform-artifacts
-#       ENV_NAME            e.g. dev/staging/prod
-#       STACK_NAME          e.g. network/tke
-#       TF_WORKDIR          e.g. infra/env/dev/network
-#
-# Notes:
-#   - We intentionally do NOT write any secret values to disk.
-#   - This script is used by GitHub Actions and can be reused in Tekton.
+#       COS_BUCKET        e.g. my-bucket-123456
+#       COS_REGION        e.g. ap-singapore
+#       COS_PREFIX        e.g. terraform-artifacts
+#       ENV_NAME          e.g. dev/staging/prod
+#       STACK_NAME        e.g. network/tke
 
 usage() {
   cat <<'EOF'
 Usage:
   scripts/cos_artifacts.sh <upload|download> <local_path> <artifact_name>
 
-Env vars:
-  COS_BUCKET, COS_REGION, COS_PREFIX, ENV_NAME, STACK_NAME
-Optional:
-  COS_ENDPOINT            override endpoint (rare)
+Env vars (common):
+  ENV_NAME, STACK_NAME, COS_PREFIX
 
-Examples:
+Real COS mode env vars:
+  COS_BUCKET, COS_REGION
+
+Dev/Test mode (no COS needed):
+  DEV_MODE=1 (or CI_MOCK=1)
+  DEV_ARTIFACTS_DIR  (optional; default: ./.artifacts)
+
+Examples (real):
   ENV_NAME=dev STACK_NAME=network COS_BUCKET=xxx COS_REGION=ap-singapore COS_PREFIX=tfartifacts \
     scripts/cos_artifacts.sh upload /tmp/tfplan.bin tfplan.bin
 
-  ENV_NAME=dev STACK_NAME=network COS_BUCKET=xxx COS_REGION=ap-singapore COS_PREFIX=tfartifacts \
-    scripts/cos_artifacts.sh download /tmp/tfplan.bin tfplan.bin
+Examples (dev/test):
+  DEV_MODE=1 ENV_NAME=dev STACK_NAME=network COS_PREFIX=tfartifacts \
+    scripts/cos_artifacts.sh upload /tmp/tfplan.bin tfplan.bin
 EOF
 }
 
@@ -53,19 +58,30 @@ require_env() {
   fi
 }
 
-ensure_coscli_config() {
-  # Many coscli setups use a config file; some support env vars.
-  # We try a safe, non-persistent approach: if user already provided config, do nothing.
-  # If not, we create a temporary config directory and point COSCLI to it when possible.
-  #
-  # If your coscli version does not support env-only auth, add your preferred config init here.
-  :
+is_dev_mode() {
+  [[ "${DEV_MODE:-}" == "1" || "${CI_MOCK:-}" == "1" || "${DEV_MODE:-}" == "true" || "${CI_MOCK:-}" == "true" ]]
+}
+
+cos_key_for() {
+  local artifact_name="$1"
+  echo "${COS_PREFIX}/${ENV_NAME}/${STACK_NAME}/${artifact_name}"
 }
 
 cos_uri_for() {
   local artifact_name="$1"
-  # Standardize: <prefix>/<env>/<stack>/<artifact>
-  echo "cos://${COS_BUCKET}/${COS_PREFIX}/${ENV_NAME}/${STACK_NAME}/${artifact_name}"
+  echo "cos://${COS_BUCKET}/$(cos_key_for "${artifact_name}")"
+}
+
+local_mock_path_for() {
+  local artifact_name="$1"
+  local base="${DEV_ARTIFACTS_DIR:-.artifacts}"
+  echo "${base}/$(cos_key_for "${artifact_name}")"
+}
+
+ensure_coscli_config() {
+  # Intentionally no-op: setup varies by coscli version.
+  # If your coscli needs explicit config, add it here (without persisting secrets).
+  :
 }
 
 main() {
@@ -78,11 +94,39 @@ main() {
   local local_path="$2"
   local artifact_name="$3"
 
-  require_env COS_BUCKET
-  require_env COS_REGION
   require_env COS_PREFIX
   require_env ENV_NAME
   require_env STACK_NAME
+
+  if is_dev_mode; then
+    local mock_path
+    mock_path="$(local_mock_path_for "${artifact_name}")"
+    mkdir -p "$(dirname "${mock_path}")"
+
+    case "${action}" in
+      upload)
+        [[ -f "${local_path}" ]] || { echo "Local file not found: ${local_path}" >&2; exit 2; }
+        echo "[DEV_MODE] Storing ${local_path} -> ${mock_path}"
+        cp -f "${local_path}" "${mock_path}"
+        ;;
+      download)
+        [[ -f "${mock_path}" ]] || { echo "[DEV_MODE] Mock artifact not found: ${mock_path}" >&2; exit 3; }
+        mkdir -p "$(dirname "${local_path}")"
+        echo "[DEV_MODE] Restoring ${mock_path} -> ${local_path}"
+        cp -f "${mock_path}" "${local_path}"
+        ;;
+      *)
+        usage
+        exit 2
+        ;;
+    esac
+
+    exit 0
+  fi
+
+  # Real COS mode
+  require_env COS_BUCKET
+  require_env COS_REGION
 
   ensure_coscli_config
 
@@ -91,13 +135,8 @@ main() {
 
   case "${action}" in
     upload)
-      if [[ ! -f "${local_path}" ]]; then
-        echo "Local file not found: ${local_path}" >&2
-        exit 2
-      fi
+      [[ -f "${local_path}" ]] || { echo "Local file not found: ${local_path}" >&2; exit 2; }
       echo "Uploading ${local_path} -> ${uri}"
-      # coscli syntax varies by version. The common pattern is `coscli cp`.
-      # If your version differs (e.g. `coscli put`), adjust here.
       coscli cp "${local_path}" "${uri}" --region "${COS_REGION}"
       ;;
 
