@@ -1,0 +1,11 @@
+region = "ap-singapore"
+org    = "example"
+env    = "prod"
+app    = "platform"
+
+vpc_cidr = "10.20.0.0/16"
+availability_zones = [
+  "ap-singapore-1",
+  "ap-singapore-2",
+  "ap-singapore-3",
+]

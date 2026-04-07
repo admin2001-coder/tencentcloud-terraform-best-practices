@@ -1,0 +1,40 @@
+name: terraform-apply
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: "Stack path to apply"
+        required: true
+        default: "infra/env/prod/network"
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ github.event.inputs.stack }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+
+      - name: Terraform init
+        run: terraform init -backend-config=backend.hcl
+        env:
+          TENCENTCLOUD_SECRET_ID: ${{ secrets.TENCENTCLOUD_SECRET_ID }}
+          TENCENTCLOUD_SECRET_KEY: ${{ secrets.TENCENTCLOUD_SECRET_KEY }}
+          TENCENTCLOUD_REGION: ${{ secrets.TENCENTCLOUD_REGION }}
+
+      - name: Terraform apply
+        run: terraform apply -auto-approve
+        env:
+          TENCENTCLOUD_SECRET_ID: ${{ secrets.TENCENTCLOUD_SECRET_ID }}
+          TENCENTCLOUD_SECRET_KEY: ${{ secrets.TENCENTCLOUD_SECRET_KEY }}
+          TENCENTCLOUD_REGION: ${{ secrets.TENCENTCLOUD_REGION }}

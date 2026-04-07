@@ -1,0 +1,17 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: terraform-plan
+spec:
+  workspaces:
+    - name: source
+  params:
+    - name: stack
+      type: string
+  steps:
+    - name: plan
+      image: hashicorp/terraform:1.7.5
+      workingDir: $(workspaces.source.path)/$(params.stack)
+      script: |
+        terraform plan -no-color -out=tfplan.out
+        terraform show -no-color tfplan.out > plan.txt

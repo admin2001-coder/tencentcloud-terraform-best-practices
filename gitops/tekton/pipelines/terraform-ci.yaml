@@ -1,0 +1,42 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: terraform-ci
+spec:
+  workspaces:
+    - name: source
+  params:
+    - name: stack
+      type: string
+  tasks:
+    - name: init
+      taskRef:
+        name: terraform-init
+      params:
+        - name: stack
+          value: $(params.stack)
+      workspaces:
+        - name: source
+          workspace: source
+
+    - name: plan
+      runAfter: ["init"]
+      taskRef:
+        name: terraform-plan
+      params:
+        - name: stack
+          value: $(params.stack)
+      workspaces:
+        - name: source
+          workspace: source
+
+    - name: apply
+      runAfter: ["plan"]
+      taskRef:
+        name: terraform-apply
+      params:
+        - name: stack
+          value: $(params.stack)
+      workspaces:
+        - name: source
+          workspace: source
