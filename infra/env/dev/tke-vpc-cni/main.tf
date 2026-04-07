@@ -1,8 +1,10 @@
-module "tke" {
-  source = "../../../modules/tke"
+terraform {
+  required_version = ">= 1.6.0"
 
-  cluster_name    = var.cluster_name
-  vpc_id          = var.vpc_id
-  subnet_ids      = var.subnet_ids
-  network_mode    = "vpc-cni"
+  required_providers {
+    tencentcloud = {
+      source  = "tencentcloudstack/tencentcloud"
+      version = "~> 1.81"
+    }
+  }
 }

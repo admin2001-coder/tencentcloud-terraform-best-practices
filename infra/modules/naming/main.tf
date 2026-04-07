@@ -1,9 +1,7 @@
 locals {
-  prefix = "${var.org}-${var.env}-${var.app}"
-  tags = {
-    org = var.org
-    env = var.env
-    app = var.app
-    managed_by = "terraform"
-  }
+  vpc_name = "${var.name}-${var.env}-vpc"
+}
+
+output "vpc_name" {
+  value = local.vpc_name
 }

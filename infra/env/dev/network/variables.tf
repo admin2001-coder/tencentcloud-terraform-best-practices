@@ -1,16 +1,19 @@
-variable "region" {
-  type    = string
-  default = "ap-singapore"
+variable "env" {
+  type        = string
+  description = "Environment name (dev/staging/prod)"
 }
 
-variable "name_prefix" {
-  type    = string
-  default = "dev"
+variable "name" {
+  type        = string
+  description = "Project name prefix"
 }
 
-variable "tags" {
-  type    = map(string)
-  default = {
-    env = "dev"
-  }
+variable "vpc_cidr" {
+  type        = string
+  description = "VPC CIDR"
+}
+
+variable "subnet_az" {
+  type        = string
+  description = "Subnet AZ"
 }
