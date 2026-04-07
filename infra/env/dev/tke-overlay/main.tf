@@ -1,10 +1,9 @@
-terraform {
-  required_version = ">= 1.6.0"
+module "naming" {
+  source = "../../../modules/naming"
+}
 
-  required_providers {
-    tencentcloud = {
-      source  = "tencentcloudstack/tencentcloud"
-      version = "~> 1.81"
-    }
-  }
+module "tke-overlay" {
+  source = "../../../modules/tke-overlay"
+
+  cluster_id = "cls-xxxx"
 }
