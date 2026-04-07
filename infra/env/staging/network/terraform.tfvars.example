@@ -1,0 +1,7 @@
+region      = "ap-singapore"
+name_prefix = "staging"
+
+tags = {
+  env   = "staging"
+  owner = "platform"
+}

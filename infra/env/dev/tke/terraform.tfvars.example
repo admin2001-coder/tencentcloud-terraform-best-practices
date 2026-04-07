@@ -1,0 +1,11 @@
+region      = "ap-singapore"
+name_prefix = "dev"
+
+# Fill from `infra/env/dev/network` outputs
+vpc_id     = "vpc-xxxx"
+subnet_ids = ["subnet-xxxx", "subnet-yyyy"]
+
+tags = {
+  env   = "dev"
+  owner = "platform"
+}

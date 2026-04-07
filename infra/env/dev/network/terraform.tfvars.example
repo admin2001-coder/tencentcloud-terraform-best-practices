@@ -1,0 +1,8 @@
+# Copy to terraform.tfvars and fill in your environment-specific values.
+region      = "ap-singapore"
+name_prefix = "dev"
+
+tags = {
+  env   = "dev"
+  owner = "platform"
+}
