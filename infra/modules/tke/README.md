@@ -1,13 +1,12 @@
-# module: tke
+# tke module
 
-A minimal, best-practices-oriented TKE module scaffold.
+Scaffold module demonstrating how to structure a TKE module while allowing two example modes:
 
-This module is intentionally conservative: it provides a place to put cluster + node pool resources, but does not try to guess your org's CNI/network mode.
+- `overlay`
+- `vpc-cni`
 
-## Inputs
-- `vpc_id`
-- `subnet_ids`
-- `cluster_name`
-
-## Outputs
-- `cluster_id`
+Replace the scaffold in `main.tf` with actual `tencentcloud_kubernetes_cluster` resources once you confirm:
+- TKE version
+- node pool types
+- CNI mode settings
+- whether you want private cluster endpoint

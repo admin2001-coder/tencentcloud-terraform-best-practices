@@ -1,16 +1,11 @@
-variable "name_prefix" { type = string }
-variable "tags" { type = map(string) }
-
-variable "vpc_id" {
+variable "cluster_name" { type = string }
+variable "vpc_id" { type = string }
+variable "subnet_ids" { type = list(string) }
+variable "network_mode" {
   type        = string
-  description = "VPC for the cluster"
-}
-
-variable "subnet_ids" {
-  type        = list(string)
-  description = "Subnets for worker nodes"
-}
-
-variable "cluster_name" {
-  type = string
+  description = "overlay or vpc-cni"
+  validation {
+    condition     = contains(["overlay", "vpc-cni"], var.network_mode)
+    error_message = "network_mode must be overlay or vpc-cni"
+  }
 }

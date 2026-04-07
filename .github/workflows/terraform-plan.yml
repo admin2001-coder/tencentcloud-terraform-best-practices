@@ -2,58 +2,62 @@ name: terraform-plan
 
 on:
   pull_request:
-    branches: [ "main" ]
+    paths:
+      - 'infra/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   plan:
     runs-on: ubuntu-latest
+
     strategy:
+      fail-fast: false
       matrix:
-        stack:
+        workdir:
+          - infra/env/dev/network
+          - infra/env/staging/network
           - infra/env/prod/network
+          - infra/env/dev/tke-overlay
+          - infra/env/dev/tke-vpc-cni
+
     defaults:
       run:
-        working-directory: ${{ matrix.stack }}
+        shell: bash
+        working-directory: ${{ matrix.workdir }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: hashicorp/setup-terraform@v3
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.7.5
+          terraform_version: 1.6.6
 
       - name: Terraform fmt
         run: terraform fmt -check -recursive
 
       - name: Terraform init
-        run: terraform init -backend-config=backend.hcl
-        env:
-          TENCENTCLOUD_SECRET_ID: ${{ secrets.TENCENTCLOUD_SECRET_ID }}
-          TENCENTCLOUD_SECRET_KEY: ${{ secrets.TENCENTCLOUD_SECRET_KEY }}
-          TENCENTCLOUD_REGION: ${{ secrets.TENCENTCLOUD_REGION }}
+        run: terraform init -input=false
 
       - name: Terraform validate
         run: terraform validate
 
       - name: Terraform plan
-        run: terraform plan -no-color -out=tfplan.out
+        run: |
+          terraform plan -input=false -no-color -out=/tmp/tfplan.bin | tee /tmp/tfplan.log
+
+      - name: Upload plan artifacts to COS (optional)
+        if: ${{ env.COS_BUCKET != '' }}
         env:
-          TENCENTCLOUD_SECRET_ID: ${{ secrets.TENCENTCLOUD_SECRET_ID }}
-          TENCENTCLOUD_SECRET_KEY: ${{ secrets.TENCENTCLOUD_SECRET_KEY }}
-          TENCENTCLOUD_REGION: ${{ secrets.TENCENTCLOUD_REGION }}
-
-      - name: Show plan (PR comment)
-        id: show
-        run: terraform show -no-color tfplan.out > plan.txt
-
-      - name: Upload plan artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan-${{ github.sha }}
-          path: |
-            ${{ matrix.stack }}/tfplan.out
-            ${{ matrix.stack }}/plan.txt
+          COS_BUCKET: ${{ secrets.COS_BUCKET }}
+          COS_REGION: ${{ secrets.COS_REGION }}
+          COS_PREFIX: ${{ secrets.COS_PREFIX }}
+          ENV_NAME: ${{ matrix.workdir && contains(matrix.workdir, 'infra/env/dev/') && 'dev' || (contains(matrix.workdir,'infra/env/staging/') && 'staging' || 'prod') }}
+          STACK_NAME: ${{ matrix.workdir && replace(matrix.workdir, format('infra/env/{0}/', (contains(matrix.workdir,'infra/env/dev/') && 'dev' || (contains(matrix.workdir,'infra/env/staging/') && 'staging' || 'prod'))), '') }}
+        run: |
+          ../../../../scripts/cos_artifacts.sh upload /tmp/tfplan.bin tfplan.bin
+          ../../../../scripts/cos_artifacts.sh upload /tmp/tfplan.log tfplan.log

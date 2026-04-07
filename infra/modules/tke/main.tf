@@ -1,13 +1,8 @@
-# NOTE: This is a scaffold. Uncomment and fill resources once you confirm your desired TKE networking mode.
-#
-# Common resources (names may vary by provider version):
-# - tencentcloud_kubernetes_cluster
-# - tencentcloud_kubernetes_node_pool
-#
-# Keep this module small and explicit; prefer additional sub-modules for addons.
+# NOTE: This module is a scaffold.
+# TKE resources differ depending on your chosen networking mode.
+# Fill in tencentcloud_kubernetes_cluster + node pools as desired.
 
+# Placeholder output to keep examples runnable without creating resources.
 locals {
-  tags = var.tags
+  cluster_id = "example-${var.network_mode}"
 }
-
-# placeholder output wiring

@@ -1,0 +1,6 @@
+region       = "ap-singapore"
+cluster_name = "dev-tke-vpc-cni"
+
+# Supply existing VPC/subnets from the network stack outputs
+vpc_id     = "vpc-xxxx"
+subnet_ids = ["subnet-xxxx", "subnet-yyyy"]

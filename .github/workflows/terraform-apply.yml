@@ -3,10 +3,10 @@ name: terraform-apply
 on:
   workflow_dispatch:
     inputs:
-      stack:
-        description: "Stack path to apply"
+      workdir:
+        description: 'Terraform stack working dir (e.g. infra/env/dev/network)'
         required: true
-        default: "infra/env/prod/network"
+        type: string
 
 permissions:
   contents: read
@@ -14,27 +14,33 @@ permissions:
 jobs:
   apply:
     runs-on: ubuntu-latest
+
     defaults:
       run:
-        working-directory: ${{ github.event.inputs.stack }}
+        shell: bash
+        working-directory: ${{ inputs.workdir }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: hashicorp/setup-terraform@v3
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.7.5
+          terraform_version: 1.6.6
 
       - name: Terraform init
-        run: terraform init -backend-config=backend.hcl
+        run: terraform init -input=false
+
+      - name: (Optional) Download last plan from COS
+        if: ${{ secrets.COS_BUCKET != '' }}
         env:
-          TENCENTCLOUD_SECRET_ID: ${{ secrets.TENCENTCLOUD_SECRET_ID }}
-          TENCENTCLOUD_SECRET_KEY: ${{ secrets.TENCENTCLOUD_SECRET_KEY }}
-          TENCENTCLOUD_REGION: ${{ secrets.TENCENTCLOUD_REGION }}
+          COS_BUCKET: ${{ secrets.COS_BUCKET }}
+          COS_REGION: ${{ secrets.COS_REGION }}
+          COS_PREFIX: ${{ secrets.COS_PREFIX }}
+          ENV_NAME: dev
+          STACK_NAME: network
+        run: |
+          echo "NOTE: set ENV_NAME/STACK_NAME mapping if you want apply to use a remote plan artifact."
 
       - name: Terraform apply
-        run: terraform apply -auto-approve
-        env:
-          TENCENTCLOUD_SECRET_ID: ${{ secrets.TENCENTCLOUD_SECRET_ID }}
-          TENCENTCLOUD_SECRET_KEY: ${{ secrets.TENCENTCLOUD_SECRET_KEY }}
-          TENCENTCLOUD_REGION: ${{ secrets.TENCENTCLOUD_REGION }}
+        run: terraform apply -input=false -auto-approve
